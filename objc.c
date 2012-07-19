@@ -52,7 +52,7 @@ typedef enum {
 static kindOption ObjcKinds[] = {
 	{TRUE, 'i', "interface", "class interface"},
 	{TRUE, 'I', "implementation", "class implementation"},
-	{TRUE, 'p', "protocol", "Protocol"},
+	{TRUE, 'P', "protocol", "Protocol"},
 	{TRUE, 'm', "method", "Object's method"},
 	{TRUE, 'c', "class", "Class' method"},
 	{TRUE, 'v', "var", "Global variable"},
@@ -452,6 +452,9 @@ static vString *tempName = NULL;
 static vString *parentName = NULL;
 static objcKind parentType = K_INTERFACE;
 
+static unsigned long tokenLine;
+static fpos_t filePosition;     /* file position of line containing tag */
+static void parseMethodsImplemName (vString * const ident, objcToken what);
 /* used to prepare tag for OCaml, just in case their is a need to
  * add additional information to the tag. */
 static void prepareTag (tagEntryInfo * tag, vString const *name, objcKind kind)
@@ -459,6 +462,12 @@ static void prepareTag (tagEntryInfo * tag, vString const *name, objcKind kind)
 	initTagEntry (tag, vStringValue (name));
 	tag->kindName = ObjcKinds[kind].name;
 	tag->kind = ObjcKinds[kind].letter;
+
+	if (toDoNext == &parseMethodsImplemName)
+	{
+		tag->lineNumber = tokenLine;
+		tag->filePosition = filePosition;
+	}
 
 	if (parentName != NULL)
 	{
@@ -630,6 +639,11 @@ static void parseMethodsImplemName (vString * const ident, objcToken what)
 		break;
 
 	case ObjcIDENTIFIER:
+		if (vStringLength (fullMethodName) == '\0')
+		{
+			tokenLine = getInputLineNumber();
+			filePosition = getInputFilePosition();
+		}
 		vStringCopy (prevIdent, ident);
 		break;
 
@@ -703,6 +717,7 @@ static void parseProperty (vString * const ident, objcToken what)
 	case Tok_semi:
 		addTag (tempName, K_PROPERTY);
 		vStringClear (tempName);
+		toDoNext = &parseMethods;
 		break;
 
 	default:
